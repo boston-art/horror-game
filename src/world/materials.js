@@ -102,6 +102,78 @@ function carpetTex() {
   });
 }
 
+// ---- basement: bare concrete ----
+// soft wrapped blotch (so the texture tiles without seams)
+function blot(g, s, x, y, rad, rgba) {
+  for (const ox of [-s, 0, s]) for (const oy of [-s, 0, s]) {
+    if (x + ox + rad < 0 || x + ox - rad > s || y + oy + rad < 0 || y + oy - rad > s) continue;
+    const grd = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, rad);
+    grd.addColorStop(0, rgba); grd.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = grd; g.fillRect(x + ox - rad, y + oy - rad, rad * 2, rad * 2);
+  }
+}
+function cracks(g, s, r, n, step, alpha) {
+  g.strokeStyle = `rgba(28,28,28,${alpha})`;
+  for (let i = 0; i < n; i++) {
+    let x = r() * s, y = r() * s, a = r() * Math.PI * 2;
+    const pts = [[x, y]], m = 20 + ((r() * 50) | 0);
+    for (let k = 0; k < m; k++) { a += (r() - 0.5) * 0.8; x += Math.cos(a) * step; y += Math.sin(a) * step; pts.push([x, y]); }
+    g.lineWidth = 0.8 + r() * 1.2;
+    for (const ox of [-s, 0, s]) for (const oy of [-s, 0, s]) {
+      g.beginPath(); pts.forEach(([px, py], k) => (k ? g.lineTo(px + ox, py + oy) : g.moveTo(px + ox, py + oy))); g.stroke();
+    }
+  }
+}
+// board-formed poured wall, one tile = 2.4 m: horizontal board marks, form-tie holes, stains, water streaks
+function rawWallTex() {
+  return canvasTexture(1024, (g, s) => {
+    const r = rng(41);
+    g.fillStyle = '#8a8883'; g.fillRect(0, 0, s, s);
+    const board = s / 16; // 0.15 m boards
+    for (let i = 0; i < 16; i++) {
+      g.fillStyle = `rgba(${r() < 0.5 ? '40,40,38' : '190,188,180'},${0.04 + r() * 0.07})`;
+      g.fillRect(0, i * board, s, board);
+      g.fillStyle = 'rgba(30,30,28,0.35)'; g.fillRect(0, i * board, s, 1.5);
+    }
+    for (let i = 0; i < 40; i++) blot(g, s, r() * s, r() * s, 40 + r() * 160, r() < 0.6 ? 'rgba(45,42,36,0.16)' : 'rgba(200,198,190,0.10)');
+    speckle(g, s, r, 30000, ['#5e5c58', '#a9a7a1', '#73716c', '#3d3c39'], 2.5);
+    // form-tie holes on a 0.6 m grid
+    for (let ix = 0; ix < 4; ix++) for (let iy = 0; iy < 4; iy++) {
+      const x = (ix + 0.5) * s / 4, y = (iy + 0.5) * s / 4;
+      g.fillStyle = 'rgba(25,25,24,0.85)'; g.beginPath(); g.arc(x, y, 6, 0, 7); g.fill();
+      g.fillStyle = 'rgba(70,50,35,0.25)'; g.beginPath(); g.arc(x, y + 6, 9, 0, 7); g.fill();
+    }
+    // water streaks running down from the top (canvas top = high on the wall)
+    for (let i = 0; i < 26; i++) {
+      const x = r() * s, len = s * (0.2 + r() * 0.8), w = 3 + r() * 14;
+      const grd = g.createLinearGradient(0, 0, 0, len);
+      grd.addColorStop(0, `rgba(${r() < 0.4 ? '80,58,36' : '38,36,32'},${0.18 + r() * 0.2})`); grd.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = grd; g.fillRect(x, 0, w, len);
+    }
+    cracks(g, s, r, 3, 7, 0.45);
+  });
+}
+// rough grey slab, one tile = 5 m: cracks and dark (damp/oil) patches
+function rawFloorTex() {
+  return canvasTexture(1024, (g, s) => {
+    const r = rng(43);
+    g.fillStyle = '#6f6e6a'; g.fillRect(0, 0, s, s);
+    for (let i = 0; i < 60; i++) blot(g, s, r() * s, r() * s, 30 + r() * 180, r() < 0.7 ? `rgba(20,20,18,${0.12 + r() * 0.25})` : 'rgba(170,168,160,0.10)');
+    speckle(g, s, r, 40000, ['#4a4946', '#8f8d88', '#5c5b57', '#2e2d2b'], 3);
+    cracks(g, s, r, 9, 8, 0.7);
+  });
+}
+// bare slab soffit with faint board marks, one tile = 3 m
+function rawCeilTex() {
+  return canvasTexture(512, (g, s) => {
+    const r = rng(47);
+    g.fillStyle = '#7d7c78'; g.fillRect(0, 0, s, s);
+    for (let i = 0; i < 10; i++) { g.fillStyle = 'rgba(30,30,28,0.25)'; g.fillRect(0, (i * s) / 10, s, 1); }
+    for (let i = 0; i < 20; i++) blot(g, s, r() * s, r() * s, 30 + r() * 90, 'rgba(35,33,30,0.15)');
+    speckle(g, s, r, 9000, ['#5a5955', '#9a9893'], 2);
+  });
+}
+
 // made-up abstract artwork (nothing copied from the real building)
 function artTex(seed) {
   const t = canvasTexture(128, (g, s) => {
@@ -201,6 +273,12 @@ export function createMaterials() {
     cabinetGrey: std({ color: 0x7c8086, roughness: 0.6, metalness: 0.3 }),
     cabinetDoor: std({ color: 0x8a8e94, roughness: 0.5, metalness: 0.35 }),
     tableOak: std({ map: wood, roughness: 0.55, color: 0xf0c890 }, 1.2),
+    rawWall: std({ map: rawWallTex(), roughness: 0.95 }, 2.4),
+    rawFloor: std({ map: rawFloorTex(), roughness: 0.85 }, 5),
+    rawCeiling: std({ map: rawCeilTex(), roughness: 1 }, 3),
+    steel: std({ color: 0x5d6166, roughness: 0.55, metalness: 0.6 }),
+    pipe: std({ color: 0x8c8a84, roughness: 0.6, metalness: 0.5 }),
+    pipeRust: std({ color: 0x5a3f2c, roughness: 0.8, metalness: 0.4 }),
     void: new THREE.MeshBasicMaterial({ color: 0x000000 }),
   };
 }

@@ -7,7 +7,7 @@ import { buildProp } from './props.js';
 // Axes: x runs from stairwell A to stairwell B, z is positive on the right-hand side
 // when walking from A toward B, y is up. All units are metres.
 
-const HINGED = new Set(['wood', 'woodWindow', 'fire', 'woodGlass', 'glassBlack', 'exit']);
+const HINGED = new Set(['wood', 'woodWindow', 'fire', 'woodGlass', 'glassBlack', 'exit', 'steel', 'steelWindow']);
 const DOOR_HEIGHT = { glassBlack: 2.5, exit: 2.3, elevator: 2.1, glassPanel: 2.75, barrier: 2.3 };
 const SEE_THROUGH = new Set(['glassBlack', 'woodGlass', 'glassPanel', 'barrier']);
 
@@ -75,11 +75,14 @@ export function buildWorld(data) {
     if (b - a < 0.01 || y1 - y0 < 0.01) return;
     const base = levelY(level), mid = (a + b) / 2, len = b - a;
     const cy = base + (y0 + y1) / 2;
+    // the basement is bare poured concrete with no skirting
+    const wm = level < 1 ? 'rawWall' : 'wall';
+    if (level < 1) baseboard = false;
     if (axis === 'x') {
-      solid('wall', mid, cy, coord, len, y1 - y0, T);
+      solid(wm, mid, cy, coord, len, y1 - y0, T);
       if (baseboard) box('woodTrim', mid, base + 0.06, coord, len, 0.12, T + 0.03);
     } else {
-      solid('wall', coord, cy, mid, T, y1 - y0, len);
+      solid(wm, coord, cy, mid, T, y1 - y0, len);
       if (baseboard) box('woodTrim', coord, base + 0.06, mid, T + 0.03, 0.12, len);
     }
   }
@@ -113,8 +116,8 @@ export function buildWorld(data) {
   }
 
   // ---------- rooms ----------
-  const FLOOR_MAT = { concrete: 'concrete', carpet: 'carpet' };
-  const CEIL_MAT = { smooth: 'ceilingSmooth', tile: 'ceilingTile' };
+  const FLOOR_MAT = { concrete: 'concrete', carpet: 'carpet', raw: 'rawFloor' };
+  const CEIL_MAT = { smooth: 'ceilingSmooth', tile: 'ceilingTile', raw: 'rawCeiling' };
   function addRoom(r) {
     const y = levelY(r.floor), h = r.height ?? ceilFor(r.floor);
     const pts = r.shape ?? [[r.x, r.z], [r.x + r.w, r.z], [r.x + r.w, r.z + r.d], [r.x, r.z + r.d]];
@@ -125,10 +128,10 @@ export function buildWorld(data) {
     };
     rooms.push(rec);
     surfaces.push({ x0: rec.x0, x1: rec.x1, z0: rec.z0, z1: rec.z1, yA: y, yB: y });
-    const fm = FLOOR_MAT[r.floorMat ?? 'concrete'];
+    const fm = FLOOR_MAT[r.floorMat ?? (r.floor < 1 ? 'raw' : 'concrete')];
     if (r.shape) polyQuad(fm, pts, y, true); else quad(fm, rec.x0, rec.z0, rec.x1, rec.z1, y, true);
 
-    const ceil = r.ceiling ?? 'smooth';
+    const ceil = r.ceiling ?? (r.floor < 1 ? 'raw' : 'smooth');
     if (ceil === 'vault') {
       // shallow barrel vault running along x
       const w = rec.z1 - rec.z0, rise = 0.35, len = rec.x1 - rec.x0;
@@ -186,6 +189,10 @@ export function buildWorld(data) {
       add('woodDoor', w / 2, h / 2, 0, w, h, th);
       if (type === 'woodWindow') add('glassDark', w * 0.52, h * 0.68, 0, w * 0.5, 0.75, th + 0.012);
       add('metalDark', w - 0.09, 1.0, 0, 0.12, 0.03, th + 0.12);
+    } else if (type === 'steel' || type === 'steelWindow') {
+      add('steel', w / 2, h / 2, 0, w, h, th + 0.01);
+      if (type === 'steelWindow') add('glassDark', w * 0.5, h * 0.7, 0, w * 0.22, 0.5, th + 0.022);
+      add('metalDark', w - 0.1, 1.0, 0, 0.12, 0.03, th + 0.12);
     } else if (type === 'fire') {
       add('woodFire', w / 2, h / 2, 0, w, h, th + 0.01);
       add('metalDark', w / 2, 1.02, 0, w * 0.84, 0.07, th + 0.14); // push bar
@@ -226,14 +233,16 @@ export function buildWorld(data) {
     const isOpening = type === 'opening';
     const h = d.height ?? (isOpening ? (w > 3 ? 2.75 : 2.3) : DOOR_HEIGHT[type] ?? 2.1);
     const coord = axis === 'x' ? d.z : d.x, centre = axis === 'x' ? d.x : d.z;
-    cut(level, axis, coord, centre - w / 2, centre + w / 2, h, `door ${d.id}`);
+    // optional glazed side lights (metres wide, each side) and a coloured transom (metres tall) round the leaf
+    const side = d.sidelights ?? 0, tr = d.transom ?? 0;
+    cut(level, axis, coord, centre - w / 2 - side, centre + w / 2 + side, h + tr, `door ${d.id}`);
 
     const g = new THREE.Group();
     if (axis === 'x') g.position.set(d.x - w / 2, base, d.z);
     else { g.position.set(d.x, base, d.z - w / 2); g.rotation.y = -Math.PI / 2; }
 
     // casing
-    const frameMat = d.frame ?? (type === 'fire' || type === 'elevator' ? 'metalDark'
+    const frameMat = d.frame ?? (type === 'fire' || type === 'elevator' || type === 'steel' || type === 'steelWindow' || level < 1 ? 'metalDark'
       : type === 'glassBlack' || type === 'glassPanel' || type === 'barrier' ? 'black' : 'woodTrim');
     const fw = 0.1, fd = T + 0.06;
     const frame = [];
@@ -256,6 +265,22 @@ export function buildWorld(data) {
       const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mats[mat]);
       m.position.set(x, y, z); m.userData.mat = mat; g.add(m);
     };
+    if (side || tr) {
+      const ox = -side, ow = w + side * 2, top = h + tr;
+      fixed(frameMat, ox - fw / 2, top / 2, 0, fw, top, fd);
+      fixed(frameMat, ox + ow + fw / 2, top / 2, 0, fw, top, fd);
+      fixed(frameMat, ox + ow / 2, top + fw / 2, 0, ow + fw * 2, fw, fd);
+      for (const sx of side ? [-side / 2 - fw / 2, w + side / 2 + fw / 2] : []) {
+        fixed('glassDark', sx, h / 2 + 0.2, 0, side - fw, h - 0.4, 0.03);
+        fixed(frameMat, sx, 0.2, 0, side - fw, 0.4, fd - 0.04);
+        const cx = axis === 'x' ? d.x - w / 2 + sx : d.x, cz = axis === 'x' ? d.z : d.z - w / 2 + sx;
+        collider(cx, cz, axis === 'x' ? side : T, axis === 'x' ? T : side, base, base + h, { seeThrough: true });
+      }
+      if (tr) {
+        const cols = ['paneRed', 'paneAmber', 'paneGreen', 'paneBlue'], n = Math.max(3, Math.round(ow / 0.32));
+        for (let i = 0; i < n; i++) fixed(cols[i % 4], ox + (ow * (i + 0.5)) / n, h + fw / 2 + (tr - fw) / 2, 0, ow / n - 0.04, tr - fw - 0.04, 0.03);
+      }
+    }
     if (type === 'glassPanel') {
       fixed('glassClear', w / 2, h / 2, 0, w, h, 0.03);
       fixed('black', w / 2, 0.05, 0, w, 0.1, 0.08);

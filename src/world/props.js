@@ -20,6 +20,11 @@ export function buildProp(p, api) {
   };
 
   switch (p.type) {
+    case 'pipe': {
+      // exposed pipe / duct / conduit run under the ceiling, visual only: len along local x, size square, yc = centre height
+      B(p.mat ?? 'pipe', 0, p.yc ?? 2.4, 0, p.len ?? 4, p.size ?? 0.12, p.size ?? 0.12);
+      break;
+    }
     case 'box': {
       B(p.mat ?? 'white', 0, p.h / 2, 0, p.w, p.h, p.d);
       C(0, 0, p.w, p.d, p.h, p.seeThrough ? { seeThrough: true } : undefined);
