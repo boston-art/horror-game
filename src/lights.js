@@ -36,7 +36,7 @@ export class Lights {
       this.meshes.push(mesh);
     }
     fixtures.forEach((f, i) => {
-      const r = hash(i + 1);
+      const r = f.y < 0 ? 1 : hash(i + 1); // nothing below floor 1 ever starts on or flickering
       f.mode = r < 0.1 ? 'on' : r < 0.3 ? 'flicker' : 'off';
       f.lit = f.mode === 'on';
       f.timer = hash(i + 77) * 2;
@@ -76,6 +76,7 @@ export class Lights {
   // A breaker was reset: every fixture on that floor stutters on for a moment, then most stay
   // on and a few keep flickering. floorHeight turns a fixture's ceiling height into its floor.
   powerFloor(floor, floorHeight) {
+    if (floor < 1) return; // the basement is never powered
     this.fixtures.forEach((f, i) => {
       if (Math.floor(f.y / floorHeight) + 1 !== floor) return;
       f.final = hash(i + 501) < 0.85 ? 'on' : 'flicker';

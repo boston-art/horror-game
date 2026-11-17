@@ -401,8 +401,8 @@ addEventListener('keydown', (e) => {
   if (!DEBUG) return;
   if (e.code === 'KeyM') minimap.toggle();
   if (e.code === 'KeyL') lights.setReview(!lights.review);
-  const n = { Digit1: 1, Digit2: 2, Digit3: 3 }[e.code];
-  if (n && world.rooms.some((r) => r.floor === n)) player.teleport(data.settings.hallMidX, 0, world.levelY(n));
+  const n = { Digit0: 0, Digit1: 1, Digit2: 2, Digit3: 3 }[e.code];
+  if (n !== undefined && world.rooms.some((r) => r.floor === n)) player.teleport(data.settings.hallMidX, 0, world.levelY(n));
 });
 
 addEventListener('keyup', (e) => { if (e.code === 'KeyE') game.eHeld = false; });
@@ -418,7 +418,7 @@ const minimap = new Minimap($('minimap'), world, data);
 minimap.visible = false;
 if (DEBUG) minimap.toggle();
 function currentFloor() {
-  return Math.max(1, Math.round(player.feetY / FH) + 1);
+  return Math.max(0, Math.round(player.feetY / FH) + 1);
 }
 function whereAmI() {
   const { x, z } = player.pos, y = player.feetY;

@@ -15,6 +15,8 @@ export function buildWorld(data) {
   const S = data.settings;
   const FH = S.floorHeight, CH = S.ceilingHeight, T = S.wallThickness;
   const levelY = (f) => (f - 1) * FH;
+  // floor 0 is the basement: lower ceilings, and it is never lit
+  const ceilFor = (f) => (f < 1 ? S.basementCeilingHeight ?? CH : CH);
   const mats = createMaterials();
   const batches = {};
   const colliders = [], surfaces = [], fixtures = [], doors = [], rooms = [], warnings = [];
@@ -114,7 +116,7 @@ export function buildWorld(data) {
   const FLOOR_MAT = { concrete: 'concrete', carpet: 'carpet' };
   const CEIL_MAT = { smooth: 'ceilingSmooth', tile: 'ceilingTile' };
   function addRoom(r) {
-    const y = levelY(r.floor), h = r.height ?? CH;
+    const y = levelY(r.floor), h = r.height ?? ceilFor(r.floor);
     const pts = r.shape ?? [[r.x, r.z], [r.x + r.w, r.z], [r.x + r.w, r.z + r.d], [r.x, r.z + r.d]];
     const xs = pts.map((p) => p[0]), zs = pts.map((p) => p[1]);
     const rec = {
@@ -161,7 +163,7 @@ export function buildWorld(data) {
 
   function addFixtures(r, rec) {
     const type = r.lights ?? 'panel';
-    if (type === 'none') return;
+    if (type === 'none' || r.floor < 1) return; // the basement has no fixtures at all
     const w = rec.x1 - rec.x0, d = rec.z1 - rec.z0, sp = r.lightSpacing ?? 4.4;
     const nx = Math.max(1, Math.round(w / sp)), nz = Math.max(1, Math.round(d / sp));
     for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
@@ -356,8 +358,8 @@ export function buildWorld(data) {
       const Y = levelY(f), top = f === highest;
       // open the hallway wall onto the stairs, and close the slab edge above the opening
       cut(f, 'x', z0, sx, ex, 99, `stairwell ${sw.id}`);
-      const fasciaTop = top ? yTop : Y + FH;
-      box('wall', midX, (Y + CH + fasciaTop) / 2, z0 - T / 2, len, fasciaTop - (Y + CH), T);
+      const fasciaTop = top ? yTop : Y + FH, fasciaBot = Y + ceilFor(f);
+      box('wall', midX, (fasciaBot + fasciaTop) / 2, z0 - T / 2, len, fasciaTop - fasciaBot, T);
 
       // lane B: up half a floor
       for (let i = 0; i < n; i++) {
@@ -380,8 +382,8 @@ export function buildWorld(data) {
       const hy = Y + FH / 2;
       box('concreteStair', midX, hy - 0.1, (zf + z1) / 2, len, 0.2, z1 - zf);
       surfaces.push({ x0: sx, x1: ex, z0: zf, z1, yA: hy, yB: hy });
-      // two tall dark windows on the half-landing
-      for (const wx of [(A0 + A1) / 2, (B0 + B1) / 2]) {
+      // two tall dark windows on the half-landing (none below ground)
+      if (hy >= 0) for (const wx of [(A0 + A1) / 2, (B0 + B1) / 2]) {
         box('white', wx, hy + 1.75, z1 - T / 2 - 0.02, 1.05, 1.9, 0.05);
         box('windowNight', wx, hy + 1.75, z1 - T / 2 - 0.05, 0.85, 1.7, 0.03);
         box('white', wx, hy + 1.75, z1 - T / 2 - 0.07, 0.9, 0.05, 0.03);
