@@ -29,7 +29,9 @@
       #staminaWrap { position: fixed; left: 24px; bottom: 24px; width: 180px; height: 6px; background: rgba(255,255,255,.12); z-index: 6; pointer-events: none; }
       #stamina { height: 100%; width: 100%; background: #d8d8d8; }
       #stamina.low { background: #b33; }
-      #keyicon { position: fixed; left: 24px; bottom: 40px; font-size: 13px; color: #ff5a4a; z-index: 6; pointer-events: none; display: none; }
+      #objective { position: fixed; left: 24px; bottom: 40px; font-size: 13px; line-height: 1.5; color: #e8c890; text-shadow: 0 1px 3px #000; white-space: pre; z-index: 6; pointer-events: none; }
+      #holdWrap { position: fixed; left: 50%; top: calc(56% + 24px); width: 180px; height: 5px; margin-left: -90px; background: rgba(255,255,255,.15); z-index: 6; pointer-events: none; display: none; }
+      #hold { height: 100%; width: 0; background: #ffd070; }
       #vignette { position: fixed; inset: 0; z-index: 4; pointer-events: none; opacity: 0; transition: opacity .3s; background: radial-gradient(ellipse at center, rgba(0,0,0,0) 25%, rgba(0,0,0,.93) 78%); }
       #grain { position: fixed; inset: -100px; z-index: 3; pointer-events: none; opacity: .09; }
     </style>
@@ -43,26 +45,27 @@
     <canvas id="minimap" width="560" height="290"></canvas>
     <div id="prompt"></div>
     <div id="msg"></div>
-    <div id="keyicon">FIRE KEY</div>
+    <div id="objective"></div>
+    <div id="holdWrap"><div id="hold"></div></div>
     <div id="staminaWrap"><div id="stamina"></div></div>
 
     <div id="title" class="screen show">
       <div>
         <h1>AFTER HOURS</h1>
-        <p>The school is locked for the night. You are not alone in it.<br />Find the fire key. Get to the exit.</p>
+        <p>The school is locked for the night. You are not alone in it.<br />The power is out and the exit will not open without it.<br />Find the fuses and reset the breaker panel on each floor. Then get out.</p>
         <table>
           <tr><td>W A S D</td><td>move</td></tr>
           <tr><td>Mouse</td><td>look</td></tr>
           <tr><td>Shift</td><td>sprint (drains stamina)</td></tr>
-          <tr><td>E</td><td>interact: doors, key, hiding spots</td></tr>
+          <tr><td>E</td><td>interact: doors, fuses, hiding spots<br />hold at a breaker panel to reset it</td></tr>
           <tr><td>F</td><td>flashlight on / off</td></tr>
         </table>
-        <p>Your walkie-talkie crackles louder the closer it gets.<br />Sprinting and doors make noise. Light makes you easy to see.</p>
+        <p>Your walkie-talkie crackles louder the closer it gets.<br />Sprinting and doors make noise. Light makes you easy to see.<br />A breaker is loud, and a lit floor hides nothing.</p>
         <button id="startBtn">START</button>
       </div>
     </div>
     <div id="paused" class="screen"><div><h1>PAUSED</h1><button id="resumeBtn">RESUME</button></div></div>
-    <div id="win" class="screen"><div><h1>YOU GOT OUT</h1><p>The fire door swings shut behind you.</p><button class="restart">PLAY AGAIN</button></div></div>
+    <div id="win" class="screen"><div><h1>YOU GOT OUT</h1><p>The lights hum behind you as the exit door swings shut.</p><button class="restart">PLAY AGAIN</button></div></div>
     <div id="dead" class="screen"><div><h1>IT FOUND YOU</h1><button class="restart">RESTART</button></div></div>
     <div id="face"><canvas id="faceCanvas"></canvas></div>
     <script type="module" src="/src/main.js"></script>

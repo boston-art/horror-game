@@ -73,14 +73,37 @@ export class Lights {
     f.mesh.instanceColor.needsUpdate = true;
   }
 
+  // A breaker was reset: every fixture on that floor stutters on for a moment, then most stay
+  // on and a few keep flickering. floorHeight turns a fixture's ceiling height into its floor.
+  powerFloor(floor, floorHeight) {
+    this.fixtures.forEach((f, i) => {
+      if (Math.floor(f.y / floorHeight) + 1 !== floor) return;
+      f.final = hash(i + 501) < 0.85 ? 'on' : 'flicker';
+      f.mode = 'flicker';
+      f.warm = 0.15 + Math.random() * 1.6;
+      f.timer = Math.random() * 0.1;
+    });
+    this.timer = 0;
+  }
+
   update(dt, cam) {
     if (!this.review) {
       for (const f of this.fixtures) {
         if (f.mode !== 'flicker') continue;
+        if (f.warm !== undefined) {
+          f.warm -= dt;
+          if (f.warm <= 0) {
+            f.mode = f.final; delete f.warm;
+            f.lit = true;
+            this.paint(f, true);
+            continue;
+          }
+        }
         f.timer -= dt;
         if (f.timer <= 0) {
           f.lit = !f.lit;
-          f.timer = f.lit ? 0.04 + Math.random() * (Math.random() < 0.3 ? 2.5 : 0.25) : 0.05 + Math.random() * 1.4;
+          f.timer = f.warm !== undefined ? 0.03 + Math.random() * 0.15
+            : f.lit ? 0.04 + Math.random() * (Math.random() < 0.3 ? 2.5 : 0.25) : 0.05 + Math.random() * 1.4;
           this.paint(f, f.lit);
         }
       }

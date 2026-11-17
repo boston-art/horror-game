@@ -11,7 +11,13 @@
     "DOORS: x,z is the centre of the door, and it must sit exactly on a room edge. wallAlong says which way that wall runs ('x' or 'z').",
     "  type: wood | woodWindow | fire | woodGlass | glassBlack | exit | elevator | opening (no door, just a gap) | glassPanel (fixed glass) | barrier.",
     "  locked: true makes it a locked door. message is what the player reads when trying it. connects lists the two rooms it joins.",
-    "settings.exitDoor is the id of the door that needs the fire key. Change it to make another door the exit.",
+    "settings.exitDoor is the id of the exit door. It opens only once every breaker panel has power. Change it to make another door the exit.",
+    "PANELS: one breaker panel per floor. x,z is the point on the wall face where the panel's back sits; rot is the way its front faces (same as facingDeg); y (optional) is the height of its centre above the floor (default 1.4).",
+    "  The number of fuses placed in the building equals the number of panels.",
+    "keySpawns: the places where fuses can appear. At the start, one distinct random entry is picked per fuse. y is the height above the floor.",
+    "settings.objective: holdTime = seconds E is held to reset a breaker; noiseRadius = metres the reset is heard (it always reaches the monster, any floor);",
+    "  alertDelay = seconds until a despawned monster returns after a reset; sightBonus = extra metres the monster sees on a powered floor;",
+    "  respawnCutPerPanel = seconds removed from its respawn gap per powered panel; respawnMinGap = the gap never goes below this.",
     "facingDeg: 0 = looking toward B, 90 = looking toward the right side, 180 = toward A, 270 = toward the left side.",
     "In the game: the top-left readout shows the room id and your x / z, and M shows the map, so you can report or fix positions.",
     "HIDING SPOTS: camY is the eye height while hidden; door (optional) is a door id that closes behind the player. PROPS: furniture, see src/world/props.js for the types."
@@ -33,6 +39,14 @@
       "x": 12.5,
       "z": -11.2,
       "facingDeg": 90
+    },
+    "objective": {
+      "holdTime": 2.5,
+      "noiseRadius": 40,
+      "alertDelay": 4,
+      "sightBonus": 8,
+      "respawnCutPerPanel": 5,
+      "respawnMinGap": 15
     },
     "monsterStart": {
       "floor": 3,
@@ -81,7 +95,7 @@
   ],
 
   "doors": [
-    {"id": "f1_exit_B", "floor": 1, "wallAlong": "z", "x": 25.6, "z": 0, "type": "exit", "width": 1.8, "locked": true, "message": "Locked. Needs the fire key.", "connects": ["f1_hall", "outside"]},
+    {"id": "f1_exit_B", "floor": 1, "wallAlong": "z", "x": 25.6, "z": 0, "type": "exit", "width": 1.8, "locked": true, "message": "No power.", "connects": ["f1_hall", "outside"]},
     {"id": "f1_wing_A", "floor": 1, "wallAlong": "z", "x": -4, "z": 0, "type": "woodGlass", "width": 1.8, "locked": true, "connects": ["f1_hall", "wing"]},
     {"id": "f1_door_beside_stairA", "floor": 1, "wallAlong": "x", "x": 1.0, "z": 1.5, "type": "woodWindow", "locked": true},
     {"id": "f1_blinds_door", "floor": 1, "wallAlong": "x", "x": -1.2, "z": -1.5, "type": "woodWindow", "locked": true},
@@ -145,6 +159,12 @@
     {"id": "f3_room_306_door", "floor": 3, "wallAlong": "x", "x": 10.8, "z": 1.5, "type": "woodWindow", "locked": true},
     {"id": "f3_room_308_door", "floor": 3, "wallAlong": "x", "x": 14.7, "z": 1.5, "type": "wood", "locked": true},
     {"id": "f3_room_310_door", "floor": 3, "wallAlong": "x", "x": 19.0, "z": 1.5, "type": "woodWindow", "locked": true}
+  ],
+
+  "panels": [
+    {"id": "panel_f1", "name": "Breaker panel, unlit side corridor", "floor": 1, "x": 1.75, "z": -6.78, "rot": 270},
+    {"id": "panel_f2", "name": "Breaker panel, side passage (B end)", "floor": 2, "x": 23.85, "z": -0.38, "rot": 270},
+    {"id": "panel_f3", "name": "Breaker panel, computer lab 305", "floor": 3, "x": 12.6, "z": -12.72, "rot": 90}
   ],
 
   "keySpawns": [

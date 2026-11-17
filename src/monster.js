@@ -151,8 +151,12 @@ const STEP_NEAR = 2;
 const SAME_FLOOR_DY = [1, 2];
 
 export class Monster {
-  constructor({ scene, world, data, physics, player, audio, game, camera, flashlightOn, openDoor, onCatch }) {
-    Object.assign(this, { scene, world, data, physics, player, audio, game, camera, flashlightOn, openDoor, onCatch });
+  constructor({ scene, world, data, physics, player, audio, game, camera, flashlightOn, openDoor, onCatch, sightBonus }) {
+    Object.assign(this, { scene, world, data, physics, player, audio, game, camera, flashlightOn, openDoor, onCatch, sightBonus });
+    // set by main.js as breakers are reset: seconds cut from the respawn gap, and its floor
+    this.respawnCut = 0;
+    this.respawnMinGap = 15;
+    this.alertTarget = null;
     this.nav = buildNav(world, data, physics);
     const s = data.settings.monsterStart;
     this.pos = new THREE.Vector3(s.x, world.levelY(s.floor), s.z);
@@ -439,9 +443,23 @@ export class Monster {
     if (n) this.goTo(n.x, n.y, n.z);
   }
 
+  // a loud event it always hears (a breaker reset): if it is away, it comes back within `delay`
+  // seconds (still spawning out of sight) and walks to the spot; if it is about, it goes now
+  alert(x, y, z, delay) {
+    if (this.phase === 'gone') {
+      this.goneTimer = Math.min(this.goneTimer, delay);
+      this.alertTarget = { x, y, z };
+      return;
+    }
+    if (this.phase === 'leaving') this.phase = 'active';
+    if (this.state !== 'chase') { this.state = 'investigate'; this.goTo(x, y, z); this.wait = 0; }
+  }
+
   despawn() {
     this.phase = 'gone';
-    this.goneTimer = CYCLE.respawnMin + Math.random() * (CYCLE.respawnMax - CYCLE.respawnMin);
+    const lo = Math.max(this.respawnMinGap, CYCLE.respawnMin - this.respawnCut);
+    const hi = Math.max(lo, CYCLE.respawnMax - this.respawnCut);
+    this.goneTimer = lo + Math.random() * (hi - lo);
     this.group.visible = false;
     this.visible = false;
     this.seesPlayer = false;
@@ -460,6 +478,7 @@ export class Monster {
     let range = this.flashlightOn() ? 21 : 8.5;
     if (p.isSprinting) range += 3;
     if (this.state === 'chase') range += 4;
+    range += this.sightBonus?.() ?? 0;          // the player stands on a powered (lit) floor
     if (Math.hypot(flat, ty - this.pos.y - SIGHT_HEIGHTS[0]) > range) return false;
     if (flat > 2.2) {
       const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
@@ -475,7 +494,8 @@ export class Monster {
   hear() {
     let best = null;
     for (const n of this.game.noises) {
-      const d = Math.hypot(n.x - this.pos.x, n.z - this.pos.z, (n.y - this.pos.y) * 2);
+      // global noises (a breaker reset) carry through floors: only horizontal distance counts
+      const d = n.global ? Math.hypot(n.x - this.pos.x, n.z - this.pos.z) : Math.hypot(n.x - this.pos.x, n.z - this.pos.z, (n.y - this.pos.y) * 2);
       if (d < n.radius && (!best || d < best.d)) best = { ...n, d };
     }
     return best;
@@ -489,7 +509,13 @@ export class Monster {
 
     if (this.phase === 'gone') {
       this.goneTimer -= dt;
-      if (this.goneTimer <= 0 && !this.trySpawn()) this.goneTimer = 2;   // nowhere safe yet: try again shortly
+      if (this.goneTimer <= 0) {
+        if (!this.trySpawn()) this.goneTimer = 2;   // nowhere safe yet: try again shortly
+        else if (this.alertTarget) {
+          const a = this.alertTarget; this.alertTarget = null;
+          this.state = 'investigate'; this.goTo(a.x, a.y, a.z); this.wait = 0;
+        }
+      }
       return;
     }
     this.roamTime += dt;

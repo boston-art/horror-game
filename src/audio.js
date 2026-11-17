@@ -201,6 +201,35 @@ export class Audio {
     this.tone({ from: 1320, to: 1320, dur: 0.25, gain: 0.08, when: 0.1 });
   }
 
+  // breaker reset: a heavy metal clunk, then the building's mains humming up and tubes ticking on
+  breaker() {
+    if (!this.ctx) return;
+    this.burst({ dur: 0.55, freq: 110, gain: 0.95, attack: 0.003 });
+    this.burst({ dur: 0.08, freq: 1900, type: 'bandpass', q: 3, gain: 0.55 });
+    this.burst({ dur: 0.35, freq: 420, type: 'bandpass', q: 2, gain: 0.4, when: 0.04 });
+    const ctx = this.ctx, t = ctx.currentTime + 0.15;
+    for (const [mult, g] of [[1, 0.14], [2, 0.07], [3, 0.035]]) {
+      const o = ctx.createOscillator(); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(18 * mult, t);
+      o.frequency.exponentialRampToValueAtTime(60 * mult, t + 1.3);
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900;
+      const gn = ctx.createGain();
+      gn.gain.setValueAtTime(0.0001, t);
+      gn.gain.exponentialRampToValueAtTime(g, t + 1.1);
+      gn.gain.setValueAtTime(g, t + 1.8);
+      gn.gain.exponentialRampToValueAtTime(0.0001, t + 3.4);
+      o.connect(lp).connect(gn).connect(this.master);
+      o.start(t); o.stop(t + 3.5);
+    }
+    for (let i = 0; i < 6; i++) this.burst({ dur: 0.04, freq: 2500 + Math.random() * 1500, type: 'highpass', gain: 0.12, when: 0.5 + Math.random() * 1.4 });
+  }
+
+  // the panel door creaking while the fuse goes in
+  panelStart() {
+    this.burst({ dur: 0.18, freq: 700, type: 'bandpass', q: 6, gain: 0.18 });
+    this.burst({ dur: 0.05, freq: 2600, type: 'bandpass', q: 4, gain: 0.2, when: 0.2 });
+  }
+
   unlock() {
     this.burst({ dur: 0.06, freq: 2200, type: 'bandpass', q: 4, gain: 0.4 });
     this.burst({ dur: 0.25, freq: 300, gain: 0.5, when: 0.25 });

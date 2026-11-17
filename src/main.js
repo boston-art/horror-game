@@ -86,38 +86,138 @@ setFlash(true);
 // ---------- game state ----------
 const game = {
   state: 'title',        // title | playing | paused | won | dying | dead
-  hasKey: false,
+  fuses: 0,              // fuses carried
+  power: 0,              // breaker panels reset
+  hold: null,            // { panel, t } while E is held at a panel
+  eHeld: false,
   noises: [],            // things the monster can hear: { x, y, z, radius }
   monster: null,
   time: 0,
 };
-function noise(x, y, z, radius) {
-  game.noises.push({ x, y, z, radius });
+function noise(x, y, z, radius, global = false) {
+  game.noises.push({ x, y, z, radius, global });
 }
 
-// ---------- fire key ----------
-const keyMesh = new THREE.Group();
-{
-  const red = new THREE.MeshStandardMaterial({ color: 0xd01818, emissive: 0x500000, roughness: 0.35, metalness: 0.4 });
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.028, 0.009, 8, 18), red);
-  const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.012, 0.01), red); shaft.position.x = 0.065;
-  const t1 = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.022, 0.01), red); t1.position.set(0.09, -0.014, 0);
-  const t2 = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.016, 0.01), red); t2.position.set(0.07, -0.012, 0);
-  keyMesh.add(ring, shaft, t1, t2);
-  keyMesh.rotation.x = -Math.PI / 2;
-  const glow = new THREE.PointLight(0xff2a1a, 0.25, 1.6, 2);
-  glow.position.y = 0.1;
-  keyMesh.add(glow);
+// ---------- objective: fuses and breaker panels ----------
+// Tuning lives in map.json settings.objective; these are the fallbacks.
+const OBJ = { holdTime: 2.5, noiseRadius: 40, alertDelay: 4, sightBonus: 8, respawnCutPerPanel: 5, respawnMinGap: 15, ...data.settings.objective };
+const PANEL = { w: 0.5, h: 0.7, d: 0.12, y: 1.4 };
+const RED = 0xff2a1a, GREEN = 0x30ff60;
+
+function makeFuse(glow = true) {
+  const g = new THREE.Group();
+  const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.05, 12),
+    new THREE.MeshStandardMaterial({ color: 0xfff0d0, emissive: 0x3a2a10, roughness: 0.1, metalness: 0, transparent: true, opacity: 0.55 }));
+  const brass = new THREE.MeshStandardMaterial({ color: 0xc9a040, emissive: 0x2a1c00, roughness: 0.35, metalness: 0.85 });
+  for (const s of [-1, 1]) {
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.016, 12), brass);
+    cap.position.y = s * 0.032;
+    g.add(cap);
+  }
+  const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.0015, 0.0015, 0.05, 4), new THREE.MeshBasicMaterial({ color: 0xffd080 }));
+  g.add(glass, wire);
+  if (glow) {
+    const l = new THREE.PointLight(0xffb050, 0.25, 1.6, 2);
+    l.position.y = 0.1;
+    g.add(l);
+  }
+  return g;
 }
-let keySpawn = null;
-if (data.keySpawns?.length) {
-  keySpawn = data.keySpawns[Math.floor(Math.random() * data.keySpawns.length)];
-  keyMesh.position.set(keySpawn.x, world.levelY(keySpawn.floor) + (keySpawn.y ?? 0.05) + 0.02, keySpawn.z);
-  scene.add(keyMesh);
+
+// fuses: one per panel, at distinct random entries of keySpawns
+const panelData = data.panels ?? [];
+const fuses = [];
+{
+  const spots = [...(data.keySpawns ?? [])];
+  for (let i = spots.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [spots[i], spots[j]] = [spots[j], spots[i]]; }
+  for (const sp of spots.slice(0, panelData.length)) {
+    const mesh = makeFuse();
+    mesh.rotation.z = Math.PI / 2;                 // lying on its side
+    const holder = new THREE.Group();
+    holder.add(mesh);
+    holder.position.set(sp.x, world.levelY(sp.floor) + (sp.y ?? 0.05) + 0.018, sp.z);
+    scene.add(holder);
+    fuses.push({ id: sp.id, spawn: sp, mesh: holder, taken: false });
+  }
+}
+
+// breaker panels: grey wall boxes, door swung open, lever, fuse slot, indicator light
+const panels = panelData.map((p) => {
+  const rot = ((p.rot ?? 0) * Math.PI) / 180;
+  const fx = Math.cos(rot), fz = Math.sin(rot);   // the way the front faces
+  const base = world.levelY(p.floor);
+  const g = new THREE.Group();
+  g.position.set(p.x + fx * PANEL.d / 2, base + (p.y ?? PANEL.y), p.z + fz * PANEL.d / 2);
+  g.rotation.y = Math.PI / 2 - rot;              // local +z = front
+  const metal = new THREE.MeshStandardMaterial({ color: 0x6d7174, roughness: 0.55, metalness: 0.6 });
+  const box = new THREE.Mesh(new THREE.BoxGeometry(PANEL.w, PANEL.h, PANEL.d), metal);
+  const inner = new THREE.Mesh(new THREE.PlaneGeometry(PANEL.w - 0.05, PANEL.h - 0.05), new THREE.MeshStandardMaterial({ color: 0x24272a, roughness: 0.8, metalness: 0.3 }));
+  inner.position.z = PANEL.d / 2 + 0.001;
+  const hinge = new THREE.Group();               // door hinged on the left edge, swung most of the way open
+  hinge.position.set(-PANEL.w / 2, 0, PANEL.d / 2);
+  const door = new THREE.Mesh(new THREE.BoxGeometry(PANEL.w - 0.02, PANEL.h - 0.02, 0.012), metal);
+  door.position.set((PANEL.w - 0.02) / 2, 0, 0.006);
+  hinge.add(door);
+  hinge.rotation.y = -1.95;
+  const dark = new THREE.MeshStandardMaterial({ color: 0x0c0c0c, roughness: 0.9 });
+  const slot = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.12, 0.03), dark);
+  slot.position.set(-0.09, -0.02, PANEL.d / 2 + 0.015);
+  const slotFuse = makeFuse(false);
+  slotFuse.position.set(-0.09, -0.02, PANEL.d / 2 + 0.035);
+  slotFuse.visible = false;
+  const leverPivot = new THREE.Group();
+  leverPivot.position.set(0.12, -0.02, PANEL.d / 2 + 0.02);
+  const lever = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.13, 0.025), new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.6 }));
+  lever.position.y = 0.06;
+  const knob = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.03, 0.035), new THREE.MeshStandardMaterial({ color: 0xa01818, roughness: 0.5 }));
+  knob.position.y = 0.13;
+  leverPivot.add(lever, knob);
+  leverPivot.rotation.x = 2.4;                  // pointing down: off
+  const ind = new THREE.Mesh(new THREE.SphereGeometry(0.016, 10, 8), new THREE.MeshBasicMaterial({ color: RED, toneMapped: false }));
+  ind.position.set(0.15, 0.27, PANEL.d / 2 + 0.01);
+  const glow = new THREE.PointLight(RED, 0.35, 2.2, 2);
+  glow.position.set(0.15, 0.27, PANEL.d / 2 + 0.12);
+  g.add(box, inner, hinge, slot, slotFuse, leverPivot, ind, glow);
+  scene.add(g);
+  return { ...p, group: g, base, wx: g.position.x, wz: g.position.z, powered: false, slotFuse, leverPivot, ind, glow };
+});
+const poweredFloors = new Set();
+const allPowered = () => game.power >= panels.length;
+
+function resetPanel(p) {
+  game.fuses--;
+  game.power++;
+  p.powered = true;
+  poweredFloors.add(p.floor);
+  p.slotFuse.visible = true;
+  p.leverPivot.rotation.x = 0.7;                // up: on
+  p.ind.material.color.setHex(GREEN);
+  p.glow.color.setHex(GREEN);
+  audio.breaker();
+  lights.powerFloor(p.floor, FH);
+  noise(p.wx, p.base, p.wz, OBJ.noiseRadius, true);
+  if (game.monster) {
+    game.monster.respawnCut = game.power * OBJ.respawnCutPerPanel;
+    game.monster.respawnMinGap = OBJ.respawnMinGap;
+    game.monster.alert(p.wx, p.base, p.wz, OBJ.alertDelay);
+  }
+  if (allPowered()) say('Power restored. The exit is unlocked.', 4);
+  else say(`The lights stutter on. Power ${game.power} / ${panels.length}.`, 3);
+  updateObjectiveHud();
 }
 
 // ---------- UI ----------
-const ui = { prompt: $('prompt'), msg: $('msg'), stamina: $('stamina'), key: $('keyicon'), vignette: $('vignette'), hud: $('hud') };
+const ui = { prompt: $('prompt'), msg: $('msg'), stamina: $('stamina'), objective: $('objective'), holdWrap: $('holdWrap'), hold: $('hold'), vignette: $('vignette'), hud: $('hud') };
+function updateObjectiveHud() {
+  ui.objective.textContent = `Power: ${game.power} / ${panels.length}\nFuses carried: ${game.fuses}`;
+}
+updateObjectiveHud();
+let hinted = false;
+function startHint() {
+  if (hinted) return;
+  hinted = true;
+  say('The power is out. Find fuses and reset the breaker on each floor.', 5);
+}
 let msgTimer = 0;
 function say(text, seconds = 2.2) {
   ui.msg.textContent = text;
@@ -141,6 +241,7 @@ function begin() {
   game.state = 'playing';
   player.active = true;
   show(null);
+  startHint();
   if (!DEBUG) Promise.resolve(canvas.requestPointerLock()).catch(() => {});
 }
 $('startBtn').addEventListener('click', begin);
@@ -154,7 +255,7 @@ document.addEventListener('pointerlockchange', () => {
     show('paused');
   }
 });
-if (DEBUG) { game.state = 'playing'; player.active = true; show(null); }
+if (DEBUG) { game.state = 'playing'; player.active = true; show(null); startHint(); }
 
 function endGame(state) {
   game.state = state;
@@ -201,6 +302,7 @@ if (data.settings.monsterStart && !params.has('nomonster')) {
   game.monster = new Monster({
     scene, world, data, physics, player, audio, game, camera,
     flashlightOn: () => flashOn, openDoor, onCatch: caught,
+    sightBonus: () => (poweredFloors.has(currentFloor()) ? OBJ.sightBonus : 0),
   });
 }
 
@@ -209,6 +311,7 @@ const doorTargets = world.doors.filter((d) => d.type !== 'opening' && d.type !==
 function findTarget() {
   if (player.hidden) return { kind: 'leave', label: 'E   Leave hiding spot' };
   const cam = camera.position;
+  const panelLabel = () => (game.fuses > 0 ? 'E   Insert fuse and reset breaker' : 'E   Breaker panel');
   const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
   let best = null, bestScore = -Infinity;
   const consider = (kind, ref, x, y, z, reach, label) => {
@@ -219,6 +322,14 @@ function findTarget() {
     const score = dot * 2 - dist;
     if (score > bestScore) { bestScore = score; best = { kind, ref, label }; }
   };
+  // while E is held at a panel only that panel counts, so the target cannot jump to a nearby fuse
+  if (game.hold) {
+    const p = game.hold.panel;
+    consider('panel', p, p.wx, p.group.position.y, p.wz, 2.0, panelLabel());
+    return best;
+  }
+  for (const p of panels) if (!p.powered) consider('panel', p, p.wx, p.group.position.y, p.wz, 2.0, panelLabel());
+  for (const f of fuses) if (!f.taken) consider('fuse', f, f.mesh.position.x, f.mesh.position.y + 0.6, f.mesh.position.z, 1.9, 'E   Take the fuse');
   for (const d of doorTargets) {
     const label = d.isExit ? 'E   Exit' : d.type === 'barrier' ? 'E   Look' : d.locked ? 'E   Try door' : d.target ? 'E   Close door' : 'E   Open door';
     consider('door', d, d.x, d.y + 1.2, d.z, 2.0, label);
@@ -226,7 +337,6 @@ function findTarget() {
   for (const h of data.hidingSpots ?? []) {
     consider('hide', h, h.x, world.levelY(h.floor) + 1.0, h.z, 1.9, `E   Hide ${h.kind}`);
   }
-  if (keySpawn && !game.hasKey) consider('key', null, keyMesh.position.x, keyMesh.position.y + 0.6, keyMesh.position.z, 1.9, 'E   Take the fire key');
   return best;
 }
 
@@ -239,12 +349,19 @@ function interact() {
     game.hideSeen = false;
     return;
   }
-  if (target.kind === 'key') {
-    game.hasKey = true;
-    scene.remove(keyMesh);
-    ui.key.style.display = 'block';
+  if (target.kind === 'fuse') {
+    const f = target.ref;
+    f.taken = true;
+    scene.remove(f.mesh);
+    game.fuses++;
     audio.pickup();
-    say('You found the fire key.');
+    say('You found a fuse.');
+    updateObjectiveHud();
+    return;
+  }
+  if (target.kind === 'panel') {
+    if (game.fuses <= 0) { audio.rattle(); say('The breaker needs a fuse.'); return; }
+    if (!game.hold) { game.hold = { panel: target.ref, t: 0 }; audio.panelStart(); }
     return;
   }
   if (target.kind === 'hide') {
@@ -257,11 +374,11 @@ function interact() {
   }
   const d = target.ref;
   if (d.isExit) {
-    if (!game.hasKey) { audio.rattle(); say(d.message); return; }
+    if (!allPowered()) { audio.rattle(); say(`No power. Reset the breakers (${game.power} / ${panels.length}).`, 3); return; }
     if (d.locked) {
       d.locked = false;
       audio.unlock();
-      say('The fire key turns.');
+      say('The door lock clicks open.');
       openDoor(d, true);
       setTimeout(() => { if (game.state === 'playing') endGame('won'); }, 1500);
     }
@@ -279,7 +396,7 @@ function interact() {
 
 addEventListener('keydown', (e) => {
   if (e.repeat) return;
-  if (e.code === 'KeyE') interact();
+  if (e.code === 'KeyE') { game.eHeld = true; interact(); }
   if (e.code === 'KeyF' && game.state === 'playing') { setFlash(!flashOn); audio.click(); }
   if (!DEBUG) return;
   if (e.code === 'KeyM') minimap.toggle();
@@ -287,6 +404,9 @@ addEventListener('keydown', (e) => {
   const n = { Digit1: 1, Digit2: 2, Digit3: 3 }[e.code];
   if (n && world.rooms.some((r) => r.floor === n)) player.teleport(data.settings.hallMidX, 0, world.levelY(n));
 });
+
+addEventListener('keyup', (e) => { if (e.code === 'KeyE') game.eHeld = false; });
+addEventListener('blur', () => { game.eHeld = false; });
 
 player.onStep = (sprint) => {
   audio.footstep(sprint);
@@ -312,6 +432,12 @@ function whereAmI() {
   }
   return best;
 }
+function debugMarks() {
+  return [
+    ...fuses.filter((f) => !f.taken).map((f) => ({ x: f.spawn.x, z: f.spawn.z, floor: f.spawn.floor, ch: 'F', color: '#ffb020' })),
+    ...panels.map((p) => ({ x: p.wx, z: p.wz, floor: p.floor, ch: 'P', color: p.powered ? '#30ff60' : '#ff3a2a' })),
+  ];
+}
 let frames = 0, fps = 0, fpsTime = 0;
 function updateHud(dt) {
   frames++; fpsTime += dt;
@@ -321,7 +447,8 @@ function updateHud(dt) {
   ui.hud.textContent =
     `Floor ${currentFloor()}  ${r ? `${r.name}  [${r.id}]` : '(between rooms)'}\n` +
     `x ${player.pos.x.toFixed(1)}   z ${player.pos.z.toFixed(1)}   facing ${player.facingDeg.toFixed(0)} deg\n` +
-    `${fps} fps   key spawn: ${keySpawn?.id ?? '-'}` + (game.monster ? `\nmonster: ${game.monster.debugText()}` : '');
+    `${fps} fps   fuses: ${fuses.map((f) => f.id + (f.taken ? '(taken)' : '')).join(', ') || '-'}\n` +
+    `panels: ${panels.map((p) => `${p.id} ${p.powered ? 'ON' : 'off'}`).join('  ')}   carried ${game.fuses}   power ${game.power}/${panels.length}` + (game.monster ? `\nmonster: ${game.monster.debugText()}` : '');
 }
 
 // ---------- update / render ----------
@@ -334,10 +461,21 @@ function update(dt) {
     game.noises.length = 0;
     target = findTarget();
     ui.prompt.textContent = target ? target.label : '';
+    // hold E at a panel: releasing or looking away cancels
+    if (game.hold) {
+      const h = game.hold;
+      if (!game.eHeld || target?.ref !== h.panel || h.panel.powered || game.fuses <= 0) game.hold = null;
+      else {
+        h.t += dt;
+        if (h.t >= OBJ.holdTime) { game.hold = null; resetPanel(h.panel); target = null; ui.prompt.textContent = ''; }
+      }
+    }
+    ui.holdWrap.style.display = game.hold ? 'block' : 'none';
+    if (game.hold) ui.hold.style.width = `${Math.min(1, game.hold.t / OBJ.holdTime) * 100}%`;
     ui.stamina.style.width = `${player.stamina * 100}%`;
     ui.stamina.classList.toggle('low', player.exhausted);
     ui.vignette.style.opacity = player.hidden ? 1 : 0;
-    if (keySpawn && !game.hasKey) keyMesh.rotation.z += dt * 1.2;
+    for (const f of fuses) if (!f.taken) f.mesh.rotation.y += dt * 1.2;
     // walkie sway
     walkie.position.y = -0.22 + Math.sin(player.bob * 2) * 0.006;
     walkie.position.x = 0.24 + Math.cos(player.bob) * 0.004;
@@ -364,7 +502,7 @@ const clock = new THREE.Clock();
 function frame() {
   const dt = Math.min(clock.getDelta(), 0.05);
   update(dt);
-  if (DEBUG) { updateHud(dt); minimap.draw(player, currentFloor(), game.monster); }
+  if (DEBUG) { updateHud(dt); minimap.draw(player, currentFloor(), game.monster, debugMarks()); }
   grain.style.transform = `translate(${(Math.random() * 100) | 0}px, ${(Math.random() * 100) | 0}px)`;
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
@@ -372,4 +510,4 @@ function frame() {
 frame();
 
 export { game, world, physics, player, audio, scene, camera, noise, endGame, openDoor, say, data };
-if (DEBUG) window.__game = { THREE, scene, camera, renderer, world, physics, player, data, game, lights, audio, update, interact, findTarget, keyMesh, openDoor, setFlash, get target() { return target; }, set target(t) { target = t; } };
+if (DEBUG) window.__game = { THREE, scene, camera, renderer, world, physics, player, data, game, lights, audio, update, interact, findTarget, fuses, panels, OBJ, resetPanel, poweredFloors, monster: game.monster, openDoor, setFlash, get target() { return target; }, set target(t) { target = t; } };

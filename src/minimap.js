@@ -17,7 +17,7 @@ export class Minimap {
     this.canvas.style.display = this.visible ? 'block' : 'none';
   }
 
-  draw(player, floor, monster) {
+  draw(player, floor, monster, marks) {
     if (!this.visible) return;
     const g = this.g, W = this.canvas.width, H = this.canvas.height;
     const px = (x) => (x - X0) * SCALE, pz = (z) => (z - Z0) * SCALE;
@@ -60,10 +60,11 @@ export class Minimap {
       g.stroke();
     }
     g.textAlign = 'center';
-    for (const k of this.data.keySpawns ?? []) {
+    // objective markers from main.js: { x, z, floor, ch, color }
+    for (const k of marks ?? []) {
       if (Math.abs(k.floor - floor) > 0.6) continue;
-      g.fillStyle = '#ffb020';
-      g.fillText('K', px(k.x), pz(k.z) + 3);
+      g.fillStyle = k.color;
+      g.fillText(k.ch, px(k.x), pz(k.z) + 3);
     }
     for (const h of this.data.hidingSpots ?? []) {
       if (h.floor !== floor) continue;
@@ -91,6 +92,6 @@ export class Minimap {
     }
     g.textAlign = 'left';
     g.fillStyle = '#aaa';
-    g.fillText(`FLOOR ${floor}   A <- x -> B   red: locked  green: open  yellow: exit  K: key spawn  H: hiding spot`, 6, H - 6);
+    g.fillText(`FLOOR ${floor}   A <- x -> B   red: locked  green: open  yellow: exit  F: fuse  P: panel  H: hiding spot`, 6, H - 6);
   }
 }
