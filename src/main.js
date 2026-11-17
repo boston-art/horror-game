@@ -201,7 +201,7 @@ function resetPanel(p) {
     game.monster.respawnMinGap = OBJ.respawnMinGap;
     game.monster.alert(p.wx, p.base, p.wz, OBJ.alertDelay);
   }
-  if (allPowered()) say('Power restored. The exit is unlocked.', 4);
+  if (allPowered()) say('Power restored. The front door in reception is unlocked.', 4);
   else say(`The lights stutter on. Power ${game.power} / ${panels.length}.`, 3);
   updateObjectiveHud();
 }

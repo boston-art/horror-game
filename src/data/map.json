@@ -33,7 +33,7 @@
       "steps": 10,
       "landingDepth": 1.7
     },
-    "exitDoor": "f1_exit_B",
+    "exitDoor": "f1_main_entrance",
     "playerStart": {
       "floor": 1,
       "x": 12.5,
@@ -95,7 +95,7 @@
   ],
 
   "doors": [
-    {"id": "f1_exit_B", "floor": 1, "wallAlong": "z", "x": 25.6, "z": 0, "type": "exit", "width": 1.8, "locked": true, "message": "No power.", "connects": ["f1_hall", "outside"]},
+    {"id": "f1_exit_B", "floor": 1, "wallAlong": "z", "x": 25.6, "z": 0, "type": "exit", "width": 1.8, "locked": true, "message": "Chained shut from the outside.", "connects": ["f1_hall", "outside"]},
     {"id": "f1_wing_A", "floor": 1, "wallAlong": "z", "x": -4, "z": 0, "type": "woodGlass", "width": 1.8, "locked": true, "connects": ["f1_hall", "wing"]},
     {"id": "f1_door_beside_stairA", "floor": 1, "wallAlong": "x", "x": 1.0, "z": 1.5, "type": "woodWindow", "locked": true},
     {"id": "f1_blinds_door", "floor": 1, "wallAlong": "x", "x": -1.2, "z": -1.5, "type": "woodWindow", "locked": true},
