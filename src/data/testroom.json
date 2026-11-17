@@ -1,0 +1,19 @@
+{
+  "settings": {
+    "floorHeight": 3.6, "ceilingHeight": 3.0, "wallThickness": 0.16, "hallMidX": 5,
+    "stairs": { "run": 2.8, "steps": 10, "landingDepth": 1.5 },
+    "exitDoor": "none",
+    "playerStart": { "floor": 1, "x": 2, "z": 0, "facingDeg": 0 }
+  },
+  "rooms": [
+    { "id": "test_room", "name": "Test room", "floor": 1, "x": 0, "z": -4, "w": 10, "d": 8, "ceiling": "tile", "lights": "panel" },
+    { "id": "test_side", "name": "Side room", "floor": 1, "x": 10, "z": -2, "w": 4, "d": 4, "floorMat": "carpet", "ceiling": "tile", "lights": "panel" }
+  ],
+  "doors": [
+    { "id": "test_door", "floor": 1, "wallAlong": "z", "x": 10, "z": 0, "type": "woodWindow" },
+    { "id": "test_locked", "floor": 1, "wallAlong": "x", "x": 5, "z": -4, "type": "wood", "locked": true }
+  ],
+  "props": [
+    { "type": "box", "name": "crate", "floor": 1, "x": 6, "z": 2, "w": 1, "d": 1, "h": 1, "mat": "deskWood" }
+  ]
+}

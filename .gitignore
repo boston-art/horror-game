@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.DS_Store
+.claude/
+# Private reference material: photos and videos of the real building. Never publish.
+references/

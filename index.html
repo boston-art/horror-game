@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>After Hours</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font-family: ui-monospace, Menlo, Consolas, monospace; color: #ddd; user-select: none; }
+      canvas#game { display: block; width: 100vw; height: 100vh; }
+      .screen { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.82); z-index: 20; text-align: center; }
+      .screen.show { display: flex; }
+      .screen h1 { font-weight: 400; letter-spacing: .35em; margin: 0 0 .8em; font-size: 34px; }
+      .screen p { color: #aaa; line-height: 1.7; margin: .4em 0; }
+      .screen table { margin: 1.2em auto; border-collapse: collapse; text-align: left; font-size: 14px; }
+      .screen td { padding: 3px 14px; }
+      .screen td:first-child { color: #fff; text-align: right; }
+      .screen button { margin-top: 1.4em; font: inherit; font-size: 16px; letter-spacing: .15em; color: #eee; background: #1a1a1a; border: 1px solid #666; padding: 10px 26px; cursor: pointer; }
+      .screen button:hover { background: #333; }
+      #dead { background: #000; }
+      #dead h1 { color: #b01818; }
+      #face { position: fixed; inset: 0; z-index: 30; display: none; background: #000; }
+      #face.show { display: block; }
+      #face canvas { width: 100%; height: 100%; display: block; }
+      #hud { position: fixed; left: 12px; top: 10px; font-size: 12px; text-shadow: 0 1px 2px #000; white-space: pre; z-index: 5; pointer-events: none; }
+      #minimap { position: fixed; right: 10px; top: 10px; background: rgba(0,0,0,.6); border: 1px solid #444; z-index: 5; pointer-events: none; display: none; }
+      #crosshair { position: fixed; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; background: rgba(255,255,255,.35); border-radius: 50%; z-index: 5; pointer-events: none; }
+      #prompt { position: fixed; left: 0; right: 0; top: 56%; text-align: center; font-size: 14px; color: #e8e8e8; text-shadow: 0 1px 3px #000; z-index: 6; pointer-events: none; }
+      #msg { position: fixed; left: 0; right: 0; bottom: 18%; text-align: center; font-size: 18px; color: #fff; text-shadow: 0 1px 4px #000; z-index: 6; pointer-events: none; opacity: 0; transition: opacity .25s; }
+      #staminaWrap { position: fixed; left: 24px; bottom: 24px; width: 180px; height: 6px; background: rgba(255,255,255,.12); z-index: 6; pointer-events: none; }
+      #stamina { height: 100%; width: 100%; background: #d8d8d8; }
+      #stamina.low { background: #b33; }
+      #keyicon { position: fixed; left: 24px; bottom: 40px; font-size: 13px; color: #ff5a4a; z-index: 6; pointer-events: none; display: none; }
+      #vignette { position: fixed; inset: 0; z-index: 4; pointer-events: none; opacity: 0; transition: opacity .3s; background: radial-gradient(ellipse at center, rgba(0,0,0,0) 25%, rgba(0,0,0,.93) 78%); }
+      #grain { position: fixed; inset: -100px; z-index: 3; pointer-events: none; opacity: .09; }
+    </style>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <div id="grain"></div>
+    <div id="vignette"></div>
+    <div id="crosshair"></div>
+    <div id="hud"></div>
+    <canvas id="minimap" width="560" height="290"></canvas>
+    <div id="prompt"></div>
+    <div id="msg"></div>
+    <div id="keyicon">FIRE KEY</div>
+    <div id="staminaWrap"><div id="stamina"></div></div>
+
+    <div id="title" class="screen show">
+      <div>
+        <h1>AFTER HOURS</h1>
+        <p>The school is locked for the night. You are not alone in it.<br />Find the fire key. Get to the exit.</p>
+        <table>
+          <tr><td>W A S D</td><td>move</td></tr>
+          <tr><td>Mouse</td><td>look</td></tr>
+          <tr><td>Shift</td><td>sprint (drains stamina)</td></tr>
+          <tr><td>E</td><td>interact: doors, key, hiding spots</td></tr>
+          <tr><td>F</td><td>flashlight on / off</td></tr>
+        </table>
+        <p>Your walkie-talkie crackles louder the closer it gets.<br />Sprinting and doors make noise. Light makes you easy to see.</p>
+        <button id="startBtn">START</button>
+      </div>
+    </div>
+    <div id="paused" class="screen"><div><h1>PAUSED</h1><button id="resumeBtn">RESUME</button></div></div>
+    <div id="win" class="screen"><div><h1>YOU GOT OUT</h1><p>The fire door swings shut behind you.</p><button class="restart">PLAY AGAIN</button></div></div>
+    <div id="dead" class="screen"><div><h1>IT FOUND YOU</h1><button class="restart">RESTART</button></div></div>
+    <div id="face"><canvas id="faceCanvas"></canvas></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
